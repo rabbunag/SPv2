@@ -45,6 +45,9 @@ using namespace std;
 */
 Mat img;
 int imgWidth, imgHeight;
+int averageBalloonWidth = 0;
+int averageBalloonHeight = 0;
+ofstream myfile;
 
 /**
 *					FUNCTIONS
@@ -102,6 +105,7 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 	Mat threshold_output;
 	vector<vector<Point> > contours;
 	vector<Vec4i> hierarchy;
+	int numberOfCaptions = 0;
 
 	// Detect edges using Threshold
 	threshold(inputImage, inputImage, 224, 250, THRESH_BINARY);
@@ -134,9 +138,16 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 			(minEllipse[i].angle >= 350 && minEllipse[i].angle <= 360)
 			)) {
 			//color = Scalar(0, 0, 255);
+			averageBalloonWidth = averageBalloonWidth + minEllipse[i].size.width;
+			averageBalloonHeight = averageBalloonHeight + minEllipse[i].size.height;
+			numberOfCaptions++;
 			ellipse(drawing, minEllipse[i], color, -1, 8);
 		}
 	}
+
+	averageBalloonWidth = averageBalloonWidth / numberOfCaptions;
+	averageBalloonHeight = averageBalloonHeight / numberOfCaptions;
+	
 	drawing = binarizeImage(drawing);
 	return drawing;
 } // end of fittingEllipse
@@ -196,10 +207,10 @@ Mat CharacterDetection(Mat inputImage){
 
 	binaryImage = binarizeImage(inputImage);
 
-	Mat element1 = getStructuringElement(MORPH_RECT, Size(5, 9));
+	Mat element1 = getStructuringElement(MORPH_RECT, Size(2, 11));
 
 	erode(binaryImage, erodeImage, element1);
-
+	imwrite((string)SAVE_FILE_DEST + "Character_Erode.jpg", erodeImage);
 
 	findContours(erodeImage, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 	vector<RotatedRect> minRect(contours.size());
@@ -209,25 +220,35 @@ Mat CharacterDetection(Mat inputImage){
 		minRect[i] = minAreaRect(Mat(contours[i]));
 	}
 
+	myfile << averageBalloonHeight;
 	Mat drawing = Mat::zeros(inputImage.size(), CV_8UC3);
 	for (int i = 0; i < contours.size(); i++)
 	{
 		Scalar color = Scalar(0, 0, 255);
 		drawContours(drawing, contours, i, Scalar(255, 0, 0), 1, 8, vector<Vec4i>(), 0, Point());
+		
+		if (
+			(minRect[i].size.width <= averageBalloonWidth / 6 &&
+			minRect[i].size.width >= averageBalloonWidth / 30  )
+			||
+			(minRect[i].size.height < averageBalloonHeight/2 &&
+			minRect[i].size.height >= averageBalloonHeight / 5)
+			/*((minRect[i].size.width <= inputImage.cols / 20 &&
+			minRect[i].size.width >= inputImage.cols / 137) ) &&
+			minRect[i].size.height >= minRect[i].size.width */
+		){
 
-
-		if (minRect[i].size.height <= inputImage.rows / 10 &&
-			minRect[i].size.width <= inputImage.cols / 10 &&
-			minRect[i].size.height > inputImage.rows / 90 &&
-			minRect[i].size.width > inputImage.cols / 90){
-
+			color = Scalar(255, 0, 0);
 			Point2f rect_points[4];
 			minRect[i].points(rect_points);
 
 			for (int j = 0; j < 4; j++){
 				line(inputImage, rect_points[j], rect_points[(j + 1) % 4], color, 1, 8);
 			}
+			
 		}
+
+		
 	}
 
 	return inputImage;
@@ -238,13 +259,16 @@ Mat CharacterDetection(Mat inputImage){
 */
 int main(int argc, char** argv)
 {
-	
+	//open file
+	myfile.open("example.odt");
+
+	//check for image file
 	if (argv[1] == NULL) {
 		printf("Include an image file");
 		return 0;
 	}
-
-	//image read
+	
+	//read image
 	img = imread(argv[1], 1);
 	imgWidth = img.rows;
 	imgHeight = img.cols;
