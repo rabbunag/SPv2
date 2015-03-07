@@ -36,6 +36,11 @@ using namespace cv;
 using namespace std;
 
 /**
+* Definitions
+*/
+#define SAVE_FILE_DEST "C:\\Users\\Abigail_pc\\Documents\\Github\\SPv2\\Debug\\"
+
+/**
 * Global Variables
 */
 Mat img;
@@ -233,7 +238,7 @@ Mat CharacterDetection(Mat inputImage){
 */
 int main(int argc, char** argv)
 {
-
+	
 	if (argv[1] == NULL) {
 		printf("Include an image file");
 		return 0;
@@ -245,17 +250,15 @@ int main(int argc, char** argv)
 	imgHeight = img.cols;
 
 	//binarize image
-	imwrite("C:\\Users\\Abigail_pc\\Documents\\Github\\SPv2\\Debug\\Binarize.jpg", binarizeImage(img));
+	imwrite((string)SAVE_FILE_DEST + "Binarize.jpg", binarizeImage(img));
 	//nameAndSaveImage(argv, binarizeImage(img), "Binarize_");
 
 	//caption detection
 	img = CaptionDetection(img);
-	imwrite("C:\\Users\\Abigail_pc\\Documents\\Github\\SPv2\\Debug\\Caption_Detection.jpg", img);
+	imwrite((string)SAVE_FILE_DEST + "Caption_Detection.jpg", img);
 
 	//character detection
 	img = CharacterDetection(img);
-	imwrite("C:\\Users\\Abigail_pc\\Documents\\Github\\SPv2\\Debug\\Character_Detection.jpg", img);
+	imwrite((string)SAVE_FILE_DEST + "Character_Detection.jpg", img);
 	
-	
-
 }
