@@ -207,7 +207,7 @@ Mat CharacterDetection(Mat inputImage){
 
 	binaryImage = binarizeImage(inputImage);
 
-	Mat element1 = getStructuringElement(MORPH_RECT, Size(2, 11));
+	Mat element1 = getStructuringElement(MORPH_RECT, Size(1, 12));
 
 	erode(binaryImage, erodeImage, element1);
 	imwrite((string)SAVE_FILE_DEST + "Character_Erode.jpg", erodeImage);
@@ -224,15 +224,19 @@ Mat CharacterDetection(Mat inputImage){
 	Mat drawing = Mat::zeros(inputImage.size(), CV_8UC3);
 	for (int i = 0; i < contours.size(); i++)
 	{
-		Scalar color = Scalar(0, 0, 255);
+		Scalar color;// = Scalar(0, 0, 255);
 		drawContours(drawing, contours, i, Scalar(255, 0, 0), 1, 8, vector<Vec4i>(), 0, Point());
 		
 		if (
-			(minRect[i].size.width <= averageBalloonWidth / 6 &&
-			minRect[i].size.width >= averageBalloonWidth / 30  )
+			((minRect[i].size.width <= averageBalloonWidth / 6 &&
+			minRect[i].size.width >= averageBalloonWidth / 10  )
 			||
-			(minRect[i].size.height < averageBalloonHeight/2 &&
-			minRect[i].size.height >= averageBalloonHeight / 5)
+			(minRect[i].size.height <= (averageBalloonHeight - (averageBalloonHeight * 0.10)) &&
+			minRect[i].size.height >= averageBalloonHeight / 5))
+			&&
+			minRect[i].size.width < minRect[i].size.height
+			&&
+			!(minRect[i].angle >=180 && minRect[i].angle <=360)
 			/*((minRect[i].size.width <= inputImage.cols / 20 &&
 			minRect[i].size.width >= inputImage.cols / 137) ) &&
 			minRect[i].size.height >= minRect[i].size.width */
@@ -245,9 +249,9 @@ Mat CharacterDetection(Mat inputImage){
 			for (int j = 0; j < 4; j++){
 				line(inputImage, rect_points[j], rect_points[(j + 1) % 4], color, 1, 8);
 			}
-			
-		}
 
+		}
+		
 		
 	}
 

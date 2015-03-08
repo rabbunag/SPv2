@@ -1,4 +1,4 @@
-﻿Build started 3/8/2015 1:50:12 AM.
+﻿Build started 3/8/2015 8:03:53 PM.
      1>Project "C:\Users\Abigail_pc\Documents\GitHub\SPv2\SPv2\SPv2.vcxproj" on node 2 (Build target(s)).
      1>ClCompile:
          C:\Program Files (x86)\Microsoft Visual Studio 12.0\VC\bin\CL.exe /c /IC:\Users\Abigail_pc\Documents\opencv\build\x64\vc12\include /IC:\Users\Abigail_pc\Documents\opencv\build\include /IC:\Users\Abigail_pc\Documents\opencv\build\include\opencv /IC:\Users\Abigail_pc\Documents\opencv\build\include\opencv2 /ZI /nologo /W3 /WX- /sdl /Od /Oy- /D WIN32 /D _DEBUG /D _CONSOLE /D _LIB /D _UNICODE /D UNICODE /D _CRT_SECURE_NO_WARNINGS /Gm /EHsc /RTC1 /MDd /GS /fp:precise /Zc:wchar_t /Zc:forScope /Yc"stdafx.h" /Fp"Debug\SPv2.pch" /Fo"Debug\\" /Fd"Debug\vc120.pdb" /Gd /TP /analyze- /errorReport:prompt stdafx.cpp
@@ -19,4 +19,4 @@
 
 Build succeeded.
 
-Time Elapsed 00:00:03.17
+Time Elapsed 00:00:03.99
