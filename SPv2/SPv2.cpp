@@ -1,8 +1,8 @@
 /**
 * Description: Special Problem: Optical Character Recognition of Hiragana and Katakana in Manga Pages and Its Translation to English Language using Translate API
 * Program Version: 2
-* Author of Code: Raquel Abigail Buñag
-* Author of Paper: Raquel Abigail Buñag and Marie Yvette de Robles
+* Author of Code: Raquel Abigail BuÃ±ag
+* Author of Paper: Raquel Abigail BuÃ±ag and Marie Yvette de Robles
 *
 * Run File: SP_Binarize <image file>
 * Example of <image file>: C:\Users\Abigail_pc\Documents\SP\SP Data Set\Raw Manga\Cardaptor Sakura\Cardcaptor Sakura 09-12\Cardcaptor Sakura 09\Sakura_v09-007.jpg
@@ -47,7 +47,11 @@ Mat img;
 int imgWidth, imgHeight;
 int averageBalloonWidth = 0;
 int averageBalloonHeight = 0;
-ofstream myfile;
+ofstream myfile("example.odt"); 
+vector<vector<Point> > contours;
+vector <int> contourIndex;
+Mat captionMask[10];
+int captionCount = 0;
 
 /**
 *					FUNCTIONS
@@ -102,8 +106,7 @@ void nameAndSaveImage(char ** filenNameAndDestination, Mat img, char * prefix){
 // from http://docs.opencv.org/doc/tutorials/imgproc/shapedescriptors/bounding_rotated_ellipses/bounding_rotated_ellipses.html
 Mat fittingEllipse(int, void*, Mat inputImage)
 {
-	Mat threshold_output;
-	vector<vector<Point> > contours;
+	Mat outputImage;
 	vector<Vec4i> hierarchy;
 	int numberOfCaptions = 0;
 
@@ -121,12 +124,30 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 	}
 
 	//Draw ellipse/caption
-	Mat drawing = Mat::zeros(inputImage.size(), CV_8UC3);
+	outputImage = Mat::zeros(inputImage.size(), CV_8UC3);
 	for (int i = 0; i < contours.size(); i++)
 	{
 		Scalar color = Scalar(255, 255, 255);
+		Mat drawing = Mat::zeros(inputImage.size(), CV_8UC3);
 
-		if (minEllipse[i].size.height >= inputImage.rows / 8 && //IJIP-290-libre.pdf
+		ellipse(drawing, minEllipse[i], color, -1, 8);
+
+		drawing = binarizeImage(drawing);
+		int area = countNonZero(drawing);
+
+		if ((area >= 10000 && area <= 40000) &&
+			(
+			(minEllipse[i].angle >= 0 && minEllipse[i].angle <= 10) ||
+			(minEllipse[i].angle >= 80 && minEllipse[i].angle <= 100) ||
+			(minEllipse[i].angle >= 170 && minEllipse[i].angle <= 190) ||
+			(minEllipse[i].angle >= 260 && minEllipse[i].angle <= 280) ||
+			(minEllipse[i].angle >= 350 && minEllipse[i].angle <= 360)
+			)){
+			ellipse(outputImage, minEllipse[i], color, -1, 8);
+			captionMask[captionCount] = drawing;
+			captionCount++;
+		}
+		/*if (minEllipse[i].size.height >= inputImage.rows / 8 && //IJIP-290-libre.pdf
 			minEllipse[i].size.width >= inputImage.cols / 10 && //IJIP-290-libre.pdf
 			minEllipse[i].size.height < inputImage.rows / 3  &&
 			minEllipse[i].size.width < inputImage.cols / 3 &&
@@ -142,14 +163,12 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 			averageBalloonHeight = averageBalloonHeight + minEllipse[i].size.height;
 			numberOfCaptions++;
 			ellipse(drawing, minEllipse[i], color, -1, 8);
-		}
+		}*/
 	}
-
-	averageBalloonWidth = averageBalloonWidth / numberOfCaptions;
-	averageBalloonHeight = averageBalloonHeight / numberOfCaptions;
 	
-	drawing = binarizeImage(drawing);
-	return drawing;
+	imwrite((string)SAVE_FILE_DEST + "out.jpg", outputImage);
+	
+	return outputImage;
 } // end of fittingEllipse
 
 Mat invertImage(Mat img){
@@ -171,6 +190,20 @@ Mat invertImage(Mat img){
 	return img;
 } // end of invertImage
 
+Mat replaceROIWithOrigImage(Mat inputImg, Mat mask){
+	Mat outputImage = inputImg;
+
+	for (int i = 0; i < inputImg.rows; i++) {
+		for (int j = 0; j < inputImg.cols; j++) {
+			if (mask.at<uchar>(i, j) == 0) {
+				outputImage.at<Vec3b>(i, j)[0] = outputImage.at<Vec3b>(i, j)[1] = outputImage.at<Vec3b>(i, j)[2] = 0;
+			}
+		}
+	}
+	imwrite((string)SAVE_FILE_DEST + "mask.jpg", outputImage);
+	return outputImage;
+}
+
 Mat CaptionDetection(Mat inputImage){
 	Mat outputImage, binaryImage, captionDetectImage;
 
@@ -182,15 +215,41 @@ Mat CaptionDetection(Mat inputImage){
 
 	//binaryImage = invertImage(binaryImage);
 
-	outputImage = inputImage;
+	
 
-	for (int i = 0; i < inputImage.rows; i++) {
-		for (int j = 0; j < inputImage.cols; j++) {
-			if (captionDetectImage.at<uchar>(i, j) == 0) {
-				outputImage.at<Vec3b>(i, j)[0] = outputImage.at<Vec3b>(i, j)[1] = outputImage.at<Vec3b>(i, j)[2] = 0;
-			}
-		}
+	for (int i = 0; i < captionCount; i++){
+		
+		Mat replacedImg = replaceROIWithOrigImage(inputImage, captionMask[i]);
+		
+		int area = countNonZero(binarizeImage(replacedImg));
+		
+		cout << area << endl;
 	}
+
+	/*vector<RotatedRect> minEllipse(contours.size());
+
+	for (int i = 0; i < contours.size(); i++)
+	{
+		if (contours[i].size() > 5)
+			minEllipse[i] = fitEllipse(Mat(contours[i]));
+	}
+
+	for (int i = 0; i < contours.size(); i++)
+	{
+		Scalar color = Scalar(255, 255, 255);
+
+		ellipse(outputImage, minEllipse[i], color, 1, 8);
+
+		
+		/*Mat mask = Mat::zeros(outputImage.rows, outputImage.cols, CV_8UC3);
+
+		mask = binarizeImage(mask);
+		int area = countNonZero(mask);
+		cout << area << endl;
+
+		if (i == 211 || i == 412 || i == 492) imwrite((string)SAVE_FILE_DEST + "mask" + to_string(i) + ".jpg", mask);
+	}*/
+
 
 	return outputImage;
 } // end of CaptionDetection
@@ -263,8 +322,6 @@ Mat CharacterDetection(Mat inputImage){
 */
 int main(int argc, char** argv)
 {
-	//open file
-	myfile.open("example.odt");
 
 	//check for image file
 	if (argv[1] == NULL) {
