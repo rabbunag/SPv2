@@ -9,7 +9,7 @@
 *
 * Date Code Created: July 24, 2014
 * Date Version 2 Created: March 7, 2015
-* Date Modified: March 7, 2015
+* Date Modified: March 25, 2015
 */
 
 /**
@@ -49,8 +49,8 @@ int averageBalloonWidth = 0;
 int averageBalloonHeight = 0;
 ofstream myfile("example.odt"); 
 vector<vector<Point> > contours;
-vector <int> contourIndex;
-Mat captionMask[10];
+int areaWholeWhite[50];
+Mat captionMask[50];
 int captionCount = 0;
 
 /**
@@ -135,7 +135,10 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 		drawing = binarizeImage(drawing);
 		int area = countNonZero(drawing);
 
-		if ((area >= 10000 && area <= 40000) &&
+		if (minEllipse[i].size.height >= inputImage.rows / 10 && //IJIP-290-libre.pdf
+			minEllipse[i].size.width >= inputImage.cols / 8 && //IJIP-290-libre.pdf
+			minEllipse[i].size.height < inputImage.rows / 3 &&
+			minEllipse[i].size.width < inputImage.cols / 3 &&
 			(
 			(minEllipse[i].angle >= 0 && minEllipse[i].angle <= 10) ||
 			(minEllipse[i].angle >= 80 && minEllipse[i].angle <= 100) ||
@@ -145,6 +148,7 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 			)){
 			ellipse(outputImage, minEllipse[i], color, -1, 8);
 			captionMask[captionCount] = drawing;
+			areaWholeWhite[captionCount] = area;
 			captionCount++;
 		}
 		/*if (minEllipse[i].size.height >= inputImage.rows / 8 && //IJIP-290-libre.pdf
@@ -190,18 +194,21 @@ Mat invertImage(Mat img){
 	return img;
 } // end of invertImage
 
-Mat replaceROIWithOrigImage(Mat inputImg, Mat mask){
+Mat replaceROIWithOrigImage(Mat inputImg, Mat mask, int k){
 	Mat outputImage = inputImg;
-
+	Mat maskImg = mask;
+	
 	for (int i = 0; i < inputImg.rows; i++) {
 		for (int j = 0; j < inputImg.cols; j++) {
-			if (mask.at<uchar>(i, j) == 0) {
-				outputImage.at<Vec3b>(i, j)[0] = outputImage.at<Vec3b>(i, j)[1] = outputImage.at<Vec3b>(i, j)[2] = 0;
+			
+			if (maskImg.at<uchar>(i, j) == 0) {
+				inputImg.at<Vec3b>(i, j)[0] = inputImg.at<Vec3b>(i, j)[1] = inputImg.at<Vec3b>(i, j)[2] = 0;
 			}
+			
 		}
 	}
-	imwrite((string)SAVE_FILE_DEST + "mask.jpg", outputImage);
-	return outputImage;
+	
+	return inputImg;
 }
 
 Mat CaptionDetection(Mat inputImage){
@@ -213,43 +220,20 @@ Mat CaptionDetection(Mat inputImage){
 	GaussianBlur(captionDetectImage, captionDetectImage, Size(9, 9), 0, 0);
 	captionDetectImage = fittingEllipse(0, 0, captionDetectImage);
 
-	//binaryImage = invertImage(binaryImage);
-
-	
-
 	for (int i = 0; i < captionCount; i++){
+
+		Mat replacedImg = replaceROIWithOrigImage(inputImage.clone(), captionMask[i], i);
+		Mat element1 = getStructuringElement(MORPH_RECT, Size(1, 12));
+		Mat binarizedReplaceImg = binarizeImage(replacedImg);
+		Mat erodeImage;
+
+		erode(binarizedReplaceImg, erodeImage, element1);
+		imwrite((string)SAVE_FILE_DEST + "maskafter[" + to_string(i) + "].jpg", erodeImage);
+		int area = countNonZero(erodeImage);
 		
-		Mat replacedImg = replaceROIWithOrigImage(inputImage, captionMask[i]);
-		
-		int area = countNonZero(binarizeImage(replacedImg));
-		
+		//if (area <= areaWholeWhite[i] - ()) imwrite((string)SAVE_FILE_DEST + "maskafter[" + to_string(i) + "].jpg", replacedImg);
 		cout << area << endl;
 	}
-
-	/*vector<RotatedRect> minEllipse(contours.size());
-
-	for (int i = 0; i < contours.size(); i++)
-	{
-		if (contours[i].size() > 5)
-			minEllipse[i] = fitEllipse(Mat(contours[i]));
-	}
-
-	for (int i = 0; i < contours.size(); i++)
-	{
-		Scalar color = Scalar(255, 255, 255);
-
-		ellipse(outputImage, minEllipse[i], color, 1, 8);
-
-		
-		/*Mat mask = Mat::zeros(outputImage.rows, outputImage.cols, CV_8UC3);
-
-		mask = binarizeImage(mask);
-		int area = countNonZero(mask);
-		cout << area << endl;
-
-		if (i == 211 || i == 412 || i == 492) imwrite((string)SAVE_FILE_DEST + "mask" + to_string(i) + ".jpg", mask);
-	}*/
-
 
 	return outputImage;
 } // end of CaptionDetection
@@ -343,7 +327,7 @@ int main(int argc, char** argv)
 	imwrite((string)SAVE_FILE_DEST + "Caption_Detection.jpg", img);
 
 	//character detection
-	img = CharacterDetection(img);
-	imwrite((string)SAVE_FILE_DEST + "Character_Detection.jpg", img);
+	/*img = CharacterDetection(img);
+	imwrite((string)SAVE_FILE_DEST + "Character_Detection.jpg", img);*/
 	
 }
