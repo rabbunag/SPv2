@@ -149,8 +149,14 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 			ellipse(outputImage, minEllipse[i], color, -1, 8);
 			captionMask[captionCount] = drawing;
 			areaWholeWhite[captionCount] = area;
+
+			averageBalloonWidth = averageBalloonWidth + minEllipse[i].size.width;
+			averageBalloonHeight = averageBalloonHeight + minEllipse[i].size.height;
+
 			captionCount++;
 		}
+
+		
 		/*if (minEllipse[i].size.height >= inputImage.rows / 8 && //IJIP-290-libre.pdf
 			minEllipse[i].size.width >= inputImage.cols / 10 && //IJIP-290-libre.pdf
 			minEllipse[i].size.height < inputImage.rows / 3  &&
@@ -169,6 +175,8 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 			ellipse(drawing, minEllipse[i], color, -1, 8);
 		}*/
 	}
+	averageBalloonHeight /= captionCount;
+	averageBalloonWidth /= captionCount;
 	
 	imwrite((string)SAVE_FILE_DEST + "out.jpg", outputImage);
 	
@@ -220,19 +228,30 @@ Mat CaptionDetection(Mat inputImage){
 	GaussianBlur(captionDetectImage, captionDetectImage, Size(9, 9), 0, 0);
 	captionDetectImage = fittingEllipse(0, 0, captionDetectImage);
 
+	cout << averageBalloonWidth << " X " << averageBalloonHeight << endl;
+
 	for (int i = 0; i < captionCount; i++){
 
 		Mat replacedImg = replaceROIWithOrigImage(inputImage.clone(), captionMask[i], i);
-		Mat element1 = getStructuringElement(MORPH_RECT, Size(1, 12));
+		Mat element1 = getStructuringElement(MORPH_RECT, Size(10, 12));
 		Mat binarizedReplaceImg = binarizeImage(replacedImg);
 		Mat erodeImage;
 
 		erode(binarizedReplaceImg, erodeImage, element1);
-		imwrite((string)SAVE_FILE_DEST + "maskafter[" + to_string(i) + "].jpg", erodeImage);
-		int area = countNonZero(erodeImage);
 		
-		//if (area <= areaWholeWhite[i] - ()) imwrite((string)SAVE_FILE_DEST + "maskafter[" + to_string(i) + "].jpg", replacedImg);
-		cout << area << endl;
+		int area = countNonZero(erodeImage);
+		int areaBlack = areaWholeWhite[i] - area;
+		cout << areaBlack << endl;
+		
+		//cout << i << ")\t" << areaWholeWhite[i] << " \t" << area << "\t\t" <<  endl;
+
+		/*if (area >= areaWholeWhite[i] - ((averageBalloonHeight / 3)*(averageBalloonWidth / 3)) &&
+			area <= areaWholeWhite[i] - ((2*averageBalloonHeight / 3)*(2*averageBalloonWidth / 3))
+			) */
+
+		if (area <= areaWholeWhite[i] - ((averageBalloonHeight / 2)*(averageBalloonWidth / 3)))
+			imwrite((string)SAVE_FILE_DEST + "maskafter[" + to_string(i) + "].jpg", erodeImage);
+		
 	}
 
 	return outputImage;
