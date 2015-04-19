@@ -9,7 +9,7 @@
 *
 * Date Code Created: July 24, 2014
 * Date Version 2 Created: March 7, 2015
-* Date Modified: April 1, 2015
+* Date Modified: April 19, 2015
 */
 
 /**
@@ -187,7 +187,7 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 	averageBalloonHeight /= captionCount;
 	averageBalloonWidth /= captionCount;
 	
-	imwrite((string)SAVE_FILE_DEST + "out.jpg", outputImage);
+	//imwrite((string)SAVE_FILE_DEST + "out.jpg", outputImage);
 	
 	return outputImage;
 } // end of fittingEllipse
@@ -242,10 +242,10 @@ Mat CaptionDetection(Mat inputImage){
 
 	//cout << averageBalloonWidth << " X " << averageBalloonHeight << endl;
 
-	cout << "i" << ")\t" << "WxH" << "\t" << "white%" << "\t" << "areaW" << endl;
+	//cout << "i" << ")\t" << "WxH" << "\t" << "white%" << "\t" << "areaW" << endl;
 
 	for (int i = 0; i < captionCount; i++){
-		cout << "--------------------------------------------------------------------------------" << endl;
+		//cout << "--------------------------------------------------------------------------------" << endl;
 		Mat replacedImg = replaceROIWithOrigImage(inputImage.clone(), captionMask[i]);
 		Mat element1 = getStructuringElement(MORPH_RECT, Size(10, 12));
 		Mat binarizedReplaceImg = binarizeImage(replacedImg);
@@ -258,7 +258,7 @@ Mat CaptionDetection(Mat inputImage){
 
 		float whitePercent = (area / (contourWidth[i] * contourHeight[i])) * 100;
 		
-		cout << i << ")\t" << contourWidth[i] << "X" << contourHeight[i] << "\t" << whitePercent << "\t" << area << endl;
+		//cout << i << ")\t" << contourWidth[i] << "X" << contourHeight[i] << "\t" << whitePercent << "\t" << area << endl;
 		
 		if (whitePercent <= 55 && whitePercent >=35	){
 			ellipse(outputImage, captionsEllipse[i], Scalar(255, 255, 255), -1, 8);
@@ -283,55 +283,55 @@ Mat CharacterDetection(Mat inputImage){
 
 	binaryImage = binarizeImage(inputImage);
 
-	Mat element1 = getStructuringElement(MORPH_RECT, Size(1, 12));
+	Mat element1 = getStructuringElement(MORPH_RECT, Size(6, 3));
 
 	erode(binaryImage, erodeImage, element1);
 	imwrite((string)SAVE_FILE_DEST + "Character_Erode.jpg", erodeImage);
 
 	findContours(erodeImage, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
-	vector<RotatedRect> minRect(contours.size());
+	vector<vector<Point> > contours_poly(contours.size());
+	vector<Rect> boundRect(contours.size());
 
 	for (int i = 0; i < contours.size(); i++)
 	{
-		minRect[i] = minAreaRect(Mat(contours[i]));
+		approxPolyDP(Mat(contours[i]), contours_poly[i], 3, true);
+		boundRect[i] = boundingRect(Mat(contours_poly[i]));
 	}
 
-	myfile << averageBalloonHeight;
-	Mat drawing = Mat::zeros(inputImage.size(), CV_8UC3);
-	for (int i = 0; i < contours.size(); i++)
+
+	/// Draw polygonal contour + bonding rects + circles
+	Mat drawing = Mat::zeros(erodeImage.size(), CV_8UC3);
+	for (int i = 0; i< contours.size(); i++)
 	{
-		Scalar color;// = Scalar(0, 0, 255);
-		drawContours(drawing, contours, i, Scalar(255, 0, 0), 1, 8, vector<Vec4i>(), 0, Point());
-		
-		if (
-			((minRect[i].size.width <= averageBalloonWidth / 6 &&
-			minRect[i].size.width >= averageBalloonWidth / 10  )
-			||
-			(minRect[i].size.height <= (averageBalloonHeight - (averageBalloonHeight * 0.10)) &&
-			minRect[i].size.height >= averageBalloonHeight / 5))
-			&&
-			minRect[i].size.width < minRect[i].size.height
-			&&
-			!(minRect[i].angle >=180 && minRect[i].angle <=360)
-			/*((minRect[i].size.width <= inputImage.cols / 20 &&
-			minRect[i].size.width >= inputImage.cols / 137) ) &&
-			minRect[i].size.height >= minRect[i].size.width */
-		){
-
-			color = Scalar(255, 0, 0);
-			Point2f rect_points[4];
-			minRect[i].points(rect_points);
-
-			for (int j = 0; j < 4; j++){
-				line(inputImage, rect_points[j], rect_points[(j + 1) % 4], color, 1, 8);
-			}
-
+		Scalar color = Scalar(255,255,255);
+		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50){
+			rectangle(drawing, boundRect[i].tl(), boundRect[i].br(), color, -1, 8);
 		}
 		
-		
 	}
 
-	return inputImage;
+	drawing = replaceROIWithOrigImage(inputImage, binarizeImage(drawing));
+	Mat element2 = getStructuringElement(MORPH_RECT, Size(6, 3));
+
+	Mat erodeImageChar;
+	erode(drawing, erodeImageChar, element2);
+
+	for (int i = 0; i< contours.size(); i++)
+	{
+		Mat characterImg = erodeImageChar(boundRect[i]);
+		Scalar color = Scalar(255, 255, 255);
+		int whitechar = countNonZero(binarizeImage(characterImg)), 
+			totalpixelchar = boundRect[i].width * boundRect[i].height,
+			blackchar = totalpixelchar - whitechar;
+
+		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50 && blackchar >= totalpixelchar/2){
+			//cout << i << "\t" << whitechar << "\t" << totalpixelchar << "\t" <<  blackchar << endl;
+			imwrite((String)SAVE_FILE_DEST + "char_mask[" + to_string(i) + "].jpg", inputImage(boundRect[i]));
+		}
+
+	}
+
+	return drawing;
 } // end of CharacterDetection
 
 /**
@@ -360,7 +360,7 @@ int main(int argc, char** argv)
 	imwrite((string)SAVE_FILE_DEST + "Caption_Detection.jpg", img);
 
 	//character detection
-	/*img = CharacterDetection(img);
-	imwrite((string)SAVE_FILE_DEST + "Character_Detection.jpg", img);*/
+	img = CharacterDetection(img);
+	imwrite((string)SAVE_FILE_DEST + "Character_Detection.jpg", img);
 	
 }
