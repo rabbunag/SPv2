@@ -9,7 +9,7 @@
 *
 * Date Code Created: July 24, 2014
 * Date Version 2 Created: March 7, 2015
-* Date Modified: March 25, 2015
+* Date Modified: April 1, 2015
 */
 
 /**
@@ -39,6 +39,7 @@ using namespace std;
 * Definitions
 */
 #define SAVE_FILE_DEST "C:\\Users\\Abigail_pc\\Documents\\Github\\SPv2\\Debug\\"
+#define TOTAL_NUMBER_INDEX 100
 
 /**
 * Global Variables
@@ -49,9 +50,12 @@ int averageBalloonWidth = 0;
 int averageBalloonHeight = 0;
 ofstream myfile("example.odt"); 
 vector<vector<Point> > contours;
-int areaWholeWhite[50];
-Mat captionMask[50];
+int areaWholeWhite[TOTAL_NUMBER_INDEX];
+Mat captionMask[TOTAL_NUMBER_INDEX];
+int contourWidth[TOTAL_NUMBER_INDEX];
+int contourHeight[TOTAL_NUMBER_INDEX];
 int captionCount = 0;
+RotatedRect captionsEllipse[TOTAL_NUMBER_INDEX];
 
 /**
 *					FUNCTIONS
@@ -116,6 +120,7 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 	findContours(inputImage, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
 
 	vector<RotatedRect> minEllipse(contours.size());
+	
 
 	for (int i = 0; i < contours.size(); i++)
 	{
@@ -137,10 +142,10 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 
 		if (minEllipse[i].size.height >= inputImage.rows / 10 && //IJIP-290-libre.pdf
 			minEllipse[i].size.width >= inputImage.cols / 8 && //IJIP-290-libre.pdf
-			minEllipse[i].size.height < inputImage.rows / 3 &&
-			minEllipse[i].size.width < inputImage.cols / 3 &&
+			minEllipse[i].size.height <= inputImage.rows / 3 &&
+			minEllipse[i].size.width <= inputImage.cols / 3 &&
 			(
-			(minEllipse[i].angle >= 0 && minEllipse[i].angle <= 10) ||
+			(minEllipse[i].angle >= 0 && minEllipse[i].angle <= 30) ||
 			(minEllipse[i].angle >= 80 && minEllipse[i].angle <= 100) ||
 			(minEllipse[i].angle >= 170 && minEllipse[i].angle <= 190) ||
 			(minEllipse[i].angle >= 260 && minEllipse[i].angle <= 280) ||
@@ -149,10 +154,14 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 			ellipse(outputImage, minEllipse[i], color, -1, 8);
 			captionMask[captionCount] = drawing;
 			areaWholeWhite[captionCount] = area;
+			contourHeight[captionCount] = minEllipse[i].size.height;
+			contourWidth[captionCount] = minEllipse[i].size.width;
+			captionsEllipse[captionCount] = minEllipse[i];
+
 
 			averageBalloonWidth = averageBalloonWidth + minEllipse[i].size.width;
 			averageBalloonHeight = averageBalloonHeight + minEllipse[i].size.height;
-
+			
 			captionCount++;
 		}
 
@@ -202,7 +211,7 @@ Mat invertImage(Mat img){
 	return img;
 } // end of invertImage
 
-Mat replaceROIWithOrigImage(Mat inputImg, Mat mask, int k){
+Mat replaceROIWithOrigImage(Mat inputImg, Mat mask){
 	Mat outputImage = inputImg;
 	Mat maskImg = mask;
 	
@@ -222,39 +231,44 @@ Mat replaceROIWithOrigImage(Mat inputImg, Mat mask, int k){
 Mat CaptionDetection(Mat inputImage){
 	Mat outputImage, binaryImage, captionDetectImage;
 
+	outputImage = Mat::zeros(inputImage.size(), CV_8UC3);
+	outputImage = binarizeImage(outputImage);
+
 	binaryImage = captionDetectImage = binarizeImage(inputImage);
 	threshold(captionDetectImage, captionDetectImage, 224, 250, 0); //IJIP-290-libre.pdf
 
 	GaussianBlur(captionDetectImage, captionDetectImage, Size(9, 9), 0, 0);
 	captionDetectImage = fittingEllipse(0, 0, captionDetectImage);
 
-	cout << averageBalloonWidth << " X " << averageBalloonHeight << endl;
+	//cout << averageBalloonWidth << " X " << averageBalloonHeight << endl;
+
+	cout << "i" << ")\t" << "WxH" << "\t" << "white%" << "\t" << "areaW" << endl;
 
 	for (int i = 0; i < captionCount; i++){
-
-		Mat replacedImg = replaceROIWithOrigImage(inputImage.clone(), captionMask[i], i);
+		cout << "--------------------------------------------------------------------------------" << endl;
+		Mat replacedImg = replaceROIWithOrigImage(inputImage.clone(), captionMask[i]);
 		Mat element1 = getStructuringElement(MORPH_RECT, Size(10, 12));
 		Mat binarizedReplaceImg = binarizeImage(replacedImg);
 		Mat erodeImage;
 
 		erode(binarizedReplaceImg, erodeImage, element1);
 		
-		int area = countNonZero(erodeImage);
+		float area = countNonZero(erodeImage);
 		int areaBlack = areaWholeWhite[i] - area;
-		cout << areaBlack << endl;
+
+		float whitePercent = (area / (contourWidth[i] * contourHeight[i])) * 100;
 		
-		//cout << i << ")\t" << areaWholeWhite[i] << " \t" << area << "\t\t" <<  endl;
+		cout << i << ")\t" << contourWidth[i] << "X" << contourHeight[i] << "\t" << whitePercent << "\t" << area << endl;
+		
+		if (whitePercent <= 55 && whitePercent >=35	){
+			ellipse(outputImage, captionsEllipse[i], Scalar(255, 255, 255), -1, 8);
+		}
 
-		/*if (area >= areaWholeWhite[i] - ((averageBalloonHeight / 3)*(averageBalloonWidth / 3)) &&
-			area <= areaWholeWhite[i] - ((2*averageBalloonHeight / 3)*(2*averageBalloonWidth / 3))
-			) */
-
-		if (area <= areaWholeWhite[i] - ((averageBalloonHeight / 2)*(averageBalloonWidth / 3)))
-			imwrite((string)SAVE_FILE_DEST + "maskafter[" + to_string(i) + "].jpg", erodeImage);
+		//imwrite((string)SAVE_FILE_DEST + "maskafter[" + to_string(i) + "].jpg", erodeImage);
 		
 	}
-
-	return outputImage;
+	
+	return replaceROIWithOrigImage(inputImage.clone(), outputImage);
 } // end of CaptionDetection
 
 /**
