@@ -40,6 +40,7 @@ using namespace std;
 */
 #define SAVE_FILE_DEST "C:\\Users\\Abigail_pc\\Documents\\Github\\SPv2\\Debug\\"
 #define TOTAL_NUMBER_INDEX 100
+#define TOTAL_NUMBER_INDEX_CHAR 1000
 
 /**
 * Global Variables
@@ -52,10 +53,9 @@ ofstream myfile("example.odt");
 vector<vector<Point> > contours;
 int areaWholeWhite[TOTAL_NUMBER_INDEX];
 Mat captionMask[TOTAL_NUMBER_INDEX];
-int contourWidth[TOTAL_NUMBER_INDEX];
-int contourHeight[TOTAL_NUMBER_INDEX];
-int captionCount = 0;
+int captionCount = 0, characterCount = 0;
 RotatedRect captionsEllipse[TOTAL_NUMBER_INDEX];
+Rect characterDetection[TOTAL_NUMBER_INDEX_CHAR];
 
 /**
 *					FUNCTIONS
@@ -154,8 +154,7 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 			ellipse(outputImage, minEllipse[i], color, -1, 8);
 			captionMask[captionCount] = drawing;
 			areaWholeWhite[captionCount] = area;
-			contourHeight[captionCount] = minEllipse[i].size.height;
-			contourWidth[captionCount] = minEllipse[i].size.width;
+			
 			captionsEllipse[captionCount] = minEllipse[i];
 
 
@@ -256,7 +255,7 @@ Mat CaptionDetection(Mat inputImage){
 		float area = countNonZero(erodeImage);
 		int areaBlack = areaWholeWhite[i] - area;
 
-		float whitePercent = (area / (contourWidth[i] * contourHeight[i])) * 100;
+		float whitePercent = (area / (captionsEllipse[i].size.width * captionsEllipse[i].size.height)) * 100;
 		
 		//cout << i << ")\t" << contourWidth[i] << "X" << contourHeight[i] << "\t" << whitePercent << "\t" << area << endl;
 		
@@ -272,7 +271,7 @@ Mat CaptionDetection(Mat inputImage){
 } // end of CaptionDetection
 
 /**
-* Character Detection Functions:
+* Character Detection/Extraction Functions:
 *	CharacterDetection
 */
 Mat CharacterDetection(Mat inputImage){
@@ -306,6 +305,7 @@ Mat CharacterDetection(Mat inputImage){
 		Scalar color = Scalar(255,255,255);
 		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50){
 			rectangle(drawing, boundRect[i].tl(), boundRect[i].br(), color, -1, 8);
+			characterDetection[characterCount] = boundRect[i];
 		}
 		
 	}
