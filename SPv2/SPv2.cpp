@@ -39,23 +39,56 @@ using namespace std;
 * Definitions
 */
 #define SAVE_FILE_DEST "C:\\Users\\Abigail_pc\\Documents\\Github\\SPv2\\Debug\\"
+#define LOAD_TEST_DEST "C:\\Users\\Abigail_pc\\Documents\\SP\\SP Data Set\\Handwritten\\save\\characters by single person\\"
 #define TOTAL_NUMBER_INDEX 100
-#define TOTAL_NUMBER_INDEX_CHAR 1000
+#define TOTAL_NUMBER_INDEX_CHAR 700
+#define NUMBER_OF_IMAGES_PER_ALPHABET_CHARACTER 9 //# of test image loaded
+#define NUMBER_OF_CHARACTERS 71
 
 /**
 * Global Variables
 */
 Mat img;
 int imgWidth, imgHeight;
-int averageBalloonWidth = 0;
-int averageBalloonHeight = 0;
 ofstream myfile("example.odt"); 
+
+//mainly for caption detection
 vector<vector<Point> > contours;
 int areaWholeWhite[TOTAL_NUMBER_INDEX];
 Mat captionMask[TOTAL_NUMBER_INDEX];
-int captionCount = 0, characterCount = 0;
+int captionCount = 0, correctCaptionsCount = 0, characterCount = 0;
 RotatedRect captionsEllipse[TOTAL_NUMBER_INDEX];
+RotatedRect captionsDetected[TOTAL_NUMBER_INDEX];
+int averageBalloonWidth = 0, averageBalloonHeight = 0;
+
+//mainly for character detection
 Rect characterDetection[TOTAL_NUMBER_INDEX_CHAR];
+int averageCharWidth = 0, averageCharHeight = 0;
+Mat extractedChar[TOTAL_NUMBER_INDEX_CHAR];
+
+//mainly for character recognition
+String alphabet[2] = { "Hiragana", "Katakana" };
+String characters[71] = {
+	"a", "i", "u", "e", "o",
+	"ka", "ki", "ku", "ke", "ko",
+	"sa", "shi", "su", "se", "so",
+	"ta", "ti", "tsu", "te", "to",
+	"na", "ni", "nu", "ne", "no",
+	"ha", "hi", "fu", "he", "ho",
+	"ma", "mi", "mu", "me", "mo",
+	"ya", "yu", "yo",
+	"ra", "ri", "ru", "re", "ro",
+	"n", "wo", "wa",
+	"ga", "gi", "gu", "ge", "go",
+	"za", "ji", "zu", "ze", "zo",
+	"da", "di", "zu", "de", "do",
+	"ba", "bi", "bu", "be", "bo",
+	"pa", "pi", "pu", "pe", "po"
+};
+
+// mainly for file
+ifstream readFile("file.txt");
+
 
 /**
 *					FUNCTIONS
@@ -99,9 +132,33 @@ void nameAndSaveImage(char ** filenNameAndDestination, Mat img, char * prefix){
 	}
 } // end of nameAndSaveImage
 
+Mat replaceROIWithOrigImage(Mat inputImg, Mat mask){
+	Mat outputImage = inputImg;
+	Mat maskImg = mask;
+
+	for (int i = 0; i < inputImg.rows; i++) {
+		for (int j = 0; j < inputImg.cols; j++) {
+
+			if (maskImg.at<uchar>(i, j) == 0) {
+				inputImg.at<Vec3b>(i, j)[0] = inputImg.at<Vec3b>(i, j)[1] = inputImg.at<Vec3b>(i, j)[2] = 0;
+			}
+
+		}
+	}
+
+	return inputImg;
+}// end of replaceROIWithOrigImage
+
+bool sortByXY(RotatedRect c, RotatedRect d){
+	return c.center.x > d.center.x;
+	return c.center.y < d.center.y;
+}// end of sortByXY
+
+
 /**
 * Caption Detection Functions:
 *	invertImage
+*	sortByXY
 *	fittingEllipes
 *	CaptionDetection
 */
@@ -185,8 +242,7 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 	}
 	averageBalloonHeight /= captionCount;
 	averageBalloonWidth /= captionCount;
-	
-	//imwrite((string)SAVE_FILE_DEST + "out.jpg", outputImage);
+
 	
 	return outputImage;
 } // end of fittingEllipse
@@ -209,23 +265,6 @@ Mat invertImage(Mat img){
 	}
 	return img;
 } // end of invertImage
-
-Mat replaceROIWithOrigImage(Mat inputImg, Mat mask){
-	Mat outputImage = inputImg;
-	Mat maskImg = mask;
-	
-	for (int i = 0; i < inputImg.rows; i++) {
-		for (int j = 0; j < inputImg.cols; j++) {
-			
-			if (maskImg.at<uchar>(i, j) == 0) {
-				inputImg.at<Vec3b>(i, j)[0] = inputImg.at<Vec3b>(i, j)[1] = inputImg.at<Vec3b>(i, j)[2] = 0;
-			}
-			
-		}
-	}
-	
-	return inputImg;
-}
 
 Mat CaptionDetection(Mat inputImage){
 	Mat outputImage, binaryImage, captionDetectImage;
@@ -260,13 +299,17 @@ Mat CaptionDetection(Mat inputImage){
 		//cout << i << ")\t" << contourWidth[i] << "X" << contourHeight[i] << "\t" << whitePercent << "\t" << area << endl;
 		
 		if (whitePercent <= 55 && whitePercent >=35	){
+			captionsDetected[correctCaptionsCount] = captionsEllipse[i];
 			ellipse(outputImage, captionsEllipse[i], Scalar(255, 255, 255), -1, 8);
+			correctCaptionsCount++;
 		}
 
 		//imwrite((string)SAVE_FILE_DEST + "maskafter[" + to_string(i) + "].jpg", erodeImage);
 		
 	}
 	
+	sort(captionsDetected, captionsDetected + correctCaptionsCount, sortByXY);
+
 	return replaceROIWithOrigImage(inputImage.clone(), outputImage);
 } // end of CaptionDetection
 
@@ -298,14 +341,13 @@ Mat CharacterDetection(Mat inputImage){
 	}
 
 
-	/// Draw polygonal contour + bonding rects + circles
+	// Draw polygonal contour + bonding rects + circles
 	Mat drawing = Mat::zeros(erodeImage.size(), CV_8UC3);
 	for (int i = 0; i< contours.size(); i++)
 	{
 		Scalar color = Scalar(255,255,255);
 		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50){
 			rectangle(drawing, boundRect[i].tl(), boundRect[i].br(), color, -1, 8);
-			characterDetection[characterCount] = boundRect[i];
 		}
 		
 	}
@@ -326,13 +368,152 @@ Mat CharacterDetection(Mat inputImage){
 
 		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50 && blackchar >= totalpixelchar/2){
 			//cout << i << "\t" << whitechar << "\t" << totalpixelchar << "\t" <<  blackchar << endl;
-			imwrite((String)SAVE_FILE_DEST + "char_mask[" + to_string(i) + "].jpg", inputImage(boundRect[i]));
+			characterDetection[characterCount] = boundRect[i];
+			
+			averageCharWidth += boundRect[i].width;
+			averageCharHeight += boundRect[i].height;
+
+
+			Mat out;
+			resize(inputImage(boundRect[i]), out, Size(150, 150), 0, 0, INTER_LINEAR);
+			out = binarizeImage(out);
+			extractedChar[characterCount] = out;
+
+			characterCount++;
+			
+			imwrite((String)SAVE_FILE_DEST + "char_mask[" + to_string(i) + "].jpg", out);
 		}
 
 	}
 
+	averageCharWidth = averageCharWidth / characterCount;
+	averageCharHeight = averageBalloonHeight / characterCount;
+
+	cout << averageCharWidth << "\t" << averageCharHeight << endl;
+
 	return drawing;
 } // end of CharacterDetection
+
+/**
+* Character Recognition Functions:
+*	CharacterFeatureExtraction
+*	CharacterRecognition
+*/
+
+/*
+TODO: Plot the values in image then use that to compare
+*/
+
+Mat CharacterFeatureExtraction(){
+	Mat plottedImg(1500, 1500, CV_8UC3, Scalar(0, 0, 0));
+	int r, g, b;
+	String imageFileName;
+	Mat loadImg, loadImg2;
+	int plotNumber = 0;
+	Point plottedXY[2200];
+
+	for (int k = 0; k < 1/*2*/; k++){
+		for (int i = 0; i < 15; i++){ //number of characters tested
+
+			r = (rand() *(i + 1)) % 255;
+			g = (rand() *(i + 1)) % 255;
+			b = (rand() *(i + 1)) % 255;
+
+			for (int j = 1; j <= NUMBER_OF_IMAGES_PER_ALPHABET_CHARACTER; j++){
+				imageFileName = alphabet[k] + "\\" + characters[i] + " (" + to_string(j) + ").jpg";
+				loadImg = imread((string)LOAD_TEST_DEST + imageFileName, 1);
+
+				if (loadImg.data){
+
+					loadImg = binarizeImage(loadImg);
+
+					Mat element1 = getStructuringElement(MORPH_RECT, Size(50, 20)); //10,5
+					erode(loadImg, loadImg2, element1);
+
+					vector<vector<Point> > contours;
+					vector<Vec4i> hierarchy;
+
+					/// Find contours
+					findContours(loadImg2, contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+
+					/// Approximate contours to polygons + get bounding rects and circles
+					vector<vector<Point> > contours_poly(contours.size());
+					vector<Rect> boundRect(contours.size());
+
+					for (int l = 0; l < contours.size(); l++)
+					{
+						approxPolyDP(Mat(contours[l]), contours_poly[l], 3, true);
+						boundRect[l] = boundingRect(Mat(contours_poly[l]));
+
+						if (contours.size() == 1) loadImg2 = loadImg(boundRect[l]);
+						else if (contours.size() > 1 && l == 1) loadImg2 = loadImg(boundRect[l]);
+					}
+
+					resize(loadImg2.clone(), loadImg2, Size(150, 150), 0, 0, INTER_LINEAR);
+
+					element1 = getStructuringElement(MORPH_RECT, Size(10, 5));
+					erode(loadImg2, loadImg2, element1);
+
+					int height = loadImg2.cols,
+						width = loadImg2.rows,
+						widthHeightStrip = 20,
+						numberPixelHorizontal = width*widthHeightStrip,
+						numberPixelVertical = height*widthHeightStrip,
+						x = loadImg2.rows/2,
+						y = loadImg2.cols/2,
+						featureX, featureY;
+
+					Mat verticalStrip = loadImg2(Rect(x, 0, widthHeightStrip, width)),
+						horizontalStrip = loadImg2(Rect(0, y, height, widthHeightStrip));
+
+					imwrite((String)SAVE_FILE_DEST + characters[i] + " (" + to_string(j) + ").jpg", horizontalStrip);
+
+					featureX = numberPixelHorizontal - countNonZero(horizontalStrip);
+					featureY = numberPixelVertical - countNonZero(verticalStrip);
+
+					
+
+					Point featuresTopPixel, featuresBottomPixel;
+					featuresTopPixel.x = featureX - 100;
+					featuresTopPixel.y = featureY - 100;
+					featuresBottomPixel.x = featuresTopPixel.x;
+					featuresBottomPixel.y = featuresTopPixel.y;
+
+					rectangle(plottedImg, featuresTopPixel, featuresBottomPixel, Scalar(b, g, r), 3);
+
+					myfile << characters[i] << "(" << j << ")" << "\t" << featureX << "\t" << featureY << endl;
+
+					plotNumber++;
+				}
+			}
+			myfile << endl;
+		}
+	}
+	cout << plotNumber << endl;
+	return plottedImg;
+}
+
+/**
+* Put to text 
+*/
+Mat printToImg (Mat inputImg) {
+
+	String line;
+	int fontFace = FONT_HERSHEY_PLAIN;
+	double fontScale = 1.5;
+	int thickness = 2;
+	Point textOrg(10, 130);
+
+	for (int i = 0; i < captionCount && !readFile.eof(); i++){
+		getline(readFile, line);
+		ellipse(inputImg, captionsDetected[i], Scalar::all(255), -1, 8);
+		putText(inputImg, line, Point(captionsDetected[i].center.x - 30, captionsDetected[i].center.y), fontFace, fontScale, Scalar::all(0), thickness, 8);
+	}
+
+	return inputImg;
+
+}
+
 
 /**
 * MAIN FUNCTION
@@ -348,6 +529,7 @@ int main(int argc, char** argv)
 	
 	//read image
 	img = imread(argv[1], 1);
+	Mat origImg = img;
 	imgWidth = img.rows;
 	imgHeight = img.cols;
 
@@ -360,7 +542,12 @@ int main(int argc, char** argv)
 	imwrite((string)SAVE_FILE_DEST + "Caption_Detection.jpg", img);
 
 	//character detection
-	img = CharacterDetection(img);
+	/*img = CharacterDetection(img);
 	imwrite((string)SAVE_FILE_DEST + "Character_Detection.jpg", img);
+
+	img = CharacterFeatureExtraction();
+	imwrite((string)SAVE_FILE_DEST + "Character_Plot.jpg", img);*/
+
+	imwrite((String)SAVE_FILE_DEST + "PUTTEXT.jpg", printToImg(origImg));
 	
 }
