@@ -154,11 +154,16 @@ bool sortByXY(RotatedRect c, RotatedRect d){
 	return c.center.y < d.center.y;
 }// end of sortByXY
 
+bool sortByXYRect(Rect c, Rect d){
+	return c.tl().x > d.tl().x;
+	return c.tl().y < d.tl().y;
+	if (c.tl().x == d.tl().x)
+		return c.tl().y < d.tl().y;
+}// end of sortByXY
 
 /**
 * Caption Detection Functions:
 *	invertImage
-*	sortByXY
 *	fittingEllipes
 *	CaptionDetection
 */
@@ -325,7 +330,7 @@ Mat CharacterDetection(Mat inputImage){
 
 	binaryImage = binarizeImage(inputImage);
 
-	Mat element1 = getStructuringElement(MORPH_RECT, Size(6, 3));
+	Mat element1 = getStructuringElement(MORPH_RECT, Size(5, 12)); //6,3
 
 	erode(binaryImage, erodeImage, element1);
 	imwrite((string)SAVE_FILE_DEST + "Character_Erode.jpg", erodeImage);
@@ -341,12 +346,15 @@ Mat CharacterDetection(Mat inputImage){
 	}
 
 
-	// Draw polygonal contour + bonding rects + circles
+	// Draw polygonal contour + bonding rects 
 	Mat drawing = Mat::zeros(erodeImage.size(), CV_8UC3);
+	Mat outout = inputImage;
 	for (int i = 0; i< contours.size(); i++)
 	{
 		Scalar color = Scalar(255,255,255);
+		
 		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50){
+			//rectangle(outout, boundRect[i].tl(), boundRect[i].br(), Scalar(255, 0, 0), 1, 8);
 			rectangle(drawing, boundRect[i].tl(), boundRect[i].br(), color, -1, 8);
 		}
 		
@@ -368,28 +376,57 @@ Mat CharacterDetection(Mat inputImage){
 
 		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50 && blackchar >= totalpixelchar/2){
 			//cout << i << "\t" << whitechar << "\t" << totalpixelchar << "\t" <<  blackchar << endl;
-			characterDetection[characterCount] = boundRect[i];
+			//rectangle(outout, boundRect[i].tl(), boundRect[i].br(), Scalar(0, 255, 0), 1, 8);
+
+			
 			
 			averageCharWidth += boundRect[i].width;
 			averageCharHeight += boundRect[i].height;
 
 
-			Mat out;
-			resize(inputImage(boundRect[i]), out, Size(150, 150), 0, 0, INTER_LINEAR);
-			out = binarizeImage(out);
-			extractedChar[characterCount] = out;
-
-			characterCount++;
 			
-			imwrite((String)SAVE_FILE_DEST + "char_mask[" + to_string(i) + "].jpg", out);
-		}
+			/*resize(inputImage(boundRect[i]), out, Size(150, 150), 0, 0, INTER_LINEAR);
+			out = binarizeImage(out);
+			extractedChar[characterCount] = out;*/
 
-	}
+			
+			
+
+			Mat out = inputImage(boundRect[i]);
+			int sizechar = 0;
+
+			imwrite((String)SAVE_FILE_DEST + "char_mask[" + to_string(i) + "].jpg", out);
+
+			while (sizechar+20 <= boundRect[i].height) {
+				Point start(1, sizechar);
+				Point endPoint(boundRect[i].width, sizechar + 20);
+				Mat characterIndividual;
+
+				characterDetection[characterCount] = Rect(boundRect[i].tl().x+1, boundRect[i].tl().y+sizechar, boundRect[i].width, 20);
+				characterCount++;
+
+				resize(out(Rect(start, endPoint)), characterIndividual, Size(150, 150), 0, 0, INTER_LINEAR);
+
+
+				imwrite((String)SAVE_FILE_DEST + "char_mask[" + to_string(i) + "]_" + to_string(sizechar) + ".jpg", characterIndividual);
+
+				sizechar += 20;
+
+
+			}
+
+			
+			
+		}//end of if
+
+	}// end of for
 
 	averageCharWidth = averageCharWidth / characterCount;
 	averageCharHeight = averageBalloonHeight / characterCount;
 
 	cout << averageCharWidth << "\t" << averageCharHeight << endl;
+
+	imwrite((String)SAVE_FILE_DEST + "outout.jpg", outout);
 
 	return drawing;
 } // end of CharacterDetection
@@ -511,9 +548,34 @@ Mat printToImg (Mat inputImg) {
 	}
 
 	return inputImg;
-
 }
 
+Mat printToCharacter(Mat inputImg) {
+
+	String line;
+	int fontFace = FONT_HERSHEY_PLAIN;
+	double fontScale = 1;
+	int thickness = 1;
+
+	sort(characterDetection, characterDetection + characterCount, sortByXYRect);
+
+	cout << characterCount << endl;
+
+	for (int i = 0; i < captionCount; i++){
+		
+		ellipse(inputImg, captionsDetected[i], Scalar::all(255), -1, 8);
+		
+	}
+
+	for (int i = 0; i < characterCount && !readFile.eof(); i++){
+		getline(readFile, line);
+		//rectangle(inputImg, characterDetection[i].tl(), characterDetection[i].br(), Scalar::all(255), -1, 8);
+		putText(inputImg, line, characterDetection[i].tl(), fontFace, fontScale, Scalar::all(0), thickness, 8);
+		
+	}
+
+	return inputImg;
+}
 
 /**
 * MAIN FUNCTION
@@ -542,12 +604,12 @@ int main(int argc, char** argv)
 	imwrite((string)SAVE_FILE_DEST + "Caption_Detection.jpg", img);
 
 	//character detection
-	/*img = CharacterDetection(img);
+	img = CharacterDetection(img);
 	imwrite((string)SAVE_FILE_DEST + "Character_Detection.jpg", img);
 
-	img = CharacterFeatureExtraction();
+	/*img = CharacterFeatureExtraction();
 	imwrite((string)SAVE_FILE_DEST + "Character_Plot.jpg", img);*/
 
-	imwrite((String)SAVE_FILE_DEST + "PUTTEXT.jpg", printToImg(origImg));
+	imwrite((String)SAVE_FILE_DEST + "PUTTEXT.jpg", printToCharacter(img));
 	
 }
