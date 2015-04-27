@@ -155,10 +155,17 @@ bool sortByXY(RotatedRect c, RotatedRect d){
 }// end of sortByXY
 
 bool sortByXYRect(Rect c, Rect d){
-	return c.tl().x > d.tl().x;
-	return c.tl().y < d.tl().y;
+
 	if (c.tl().x == d.tl().x)
 		return c.tl().y < d.tl().y;
+	if (c.tl().y == d.tl().y)
+		return c.tl().x > d.tl().x;
+
+	return c.tl().x > d.tl().x;
+	return c.tl().y < d.tl().y;
+	
+	
+	
 }// end of sortByXY
 
 /**
@@ -330,7 +337,7 @@ Mat CharacterDetection(Mat inputImage){
 
 	binaryImage = binarizeImage(inputImage);
 
-	Mat element1 = getStructuringElement(MORPH_RECT, Size(5, 12)); //6,3
+	Mat element1 = getStructuringElement(MORPH_RECT, Size(3, 12)); //6,3
 
 	erode(binaryImage, erodeImage, element1);
 	imwrite((string)SAVE_FILE_DEST + "Character_Erode.jpg", erodeImage);
@@ -351,13 +358,13 @@ Mat CharacterDetection(Mat inputImage){
 	Mat outout = inputImage;
 	for (int i = 0; i< contours.size(); i++)
 	{
-		Scalar color = Scalar(255,255,255);
-		
+		Scalar color = Scalar(255, 255, 255);
+
 		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50){
 			//rectangle(outout, boundRect[i].tl(), boundRect[i].br(), Scalar(255, 0, 0), 1, 8);
 			rectangle(drawing, boundRect[i].tl(), boundRect[i].br(), color, -1, 8);
 		}
-		
+
 	}
 
 	drawing = replaceROIWithOrigImage(inputImage, binarizeImage(drawing));
@@ -370,39 +377,37 @@ Mat CharacterDetection(Mat inputImage){
 	{
 		Mat characterImg = erodeImageChar(boundRect[i]);
 		Scalar color = Scalar(255, 255, 255);
-		int whitechar = countNonZero(binarizeImage(characterImg)), 
+		int whitechar = countNonZero(binarizeImage(characterImg)),
 			totalpixelchar = boundRect[i].width * boundRect[i].height,
 			blackchar = totalpixelchar - whitechar;
 
-		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50 && blackchar >= totalpixelchar/2){
+		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50){
 			//cout << i << "\t" << whitechar << "\t" << totalpixelchar << "\t" <<  blackchar << endl;
 			//rectangle(outout, boundRect[i].tl(), boundRect[i].br(), Scalar(0, 255, 0), 1, 8);
 
-			
-			
+
+
 			averageCharWidth += boundRect[i].width;
 			averageCharHeight += boundRect[i].height;
 
 
-			
+
 			/*resize(inputImage(boundRect[i]), out, Size(150, 150), 0, 0, INTER_LINEAR);
 			out = binarizeImage(out);
-			extractedChar[characterCount] = out;*/
+			extractedChar[characterCount] = out;
+			*/
 
-			
-			
+
 
 			Mat out = inputImage(boundRect[i]);
-			int sizechar = 0;
+			int sizechar = 0, charheight = 21;
 
-			imwrite((String)SAVE_FILE_DEST + "char_mask[" + to_string(i) + "].jpg", out);
-
-			while (sizechar+20 <= boundRect[i].height) {
+			while (sizechar + charheight <= boundRect[i].height) {
 				Point start(1, sizechar);
-				Point endPoint(boundRect[i].width, sizechar + 20);
+				Point endPoint(boundRect[i].width, sizechar + charheight);
 				Mat characterIndividual;
 
-				characterDetection[characterCount] = Rect(boundRect[i].tl().x+1, boundRect[i].tl().y+sizechar, boundRect[i].width, 20);
+				characterDetection[characterCount] = Rect(boundRect[i].tl().x + 1, boundRect[i].tl().y + sizechar, boundRect[i].width, charheight);
 				characterCount++;
 
 				resize(out(Rect(start, endPoint)), characterIndividual, Size(150, 150), 0, 0, INTER_LINEAR);
@@ -415,20 +420,20 @@ Mat CharacterDetection(Mat inputImage){
 
 			}
 
-			
-			
+
+
 		}//end of if
 
 	}// end of for
 
-	averageCharWidth = averageCharWidth / characterCount;
-	averageCharHeight = averageBalloonHeight / characterCount;
+			averageCharWidth = averageCharWidth / characterCount;
+			averageCharHeight = averageBalloonHeight / characterCount;
 
-	cout << averageCharWidth << "\t" << averageCharHeight << endl;
+			cout << averageCharWidth << "\t" << averageCharHeight << endl;
 
-	imwrite((String)SAVE_FILE_DEST + "outout.jpg", outout);
+			imwrite((String)SAVE_FILE_DEST + "outout.jpg", outout);
 
-	return drawing;
+			return drawing;
 } // end of CharacterDetection
 
 /**
