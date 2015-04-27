@@ -232,25 +232,6 @@ Mat fittingEllipse(int, void*, Mat inputImage)
 			
 			captionCount++;
 		}
-
-		
-		/*if (minEllipse[i].size.height >= inputImage.rows / 8 && //IJIP-290-libre.pdf
-			minEllipse[i].size.width >= inputImage.cols / 10 && //IJIP-290-libre.pdf
-			minEllipse[i].size.height < inputImage.rows / 3  &&
-			minEllipse[i].size.width < inputImage.cols / 3 &&
-			(
-			(minEllipse[i].angle >= 0 && minEllipse[i].angle <= 10) ||
-			(minEllipse[i].angle >= 80 && minEllipse[i].angle <= 100) ||
-			(minEllipse[i].angle >= 170 && minEllipse[i].angle <= 190) ||
-			(minEllipse[i].angle >= 260 && minEllipse[i].angle <= 280) ||
-			(minEllipse[i].angle >= 350 && minEllipse[i].angle <= 360)
-			)) {
-			//color = Scalar(0, 0, 255);
-			averageBalloonWidth = averageBalloonWidth + minEllipse[i].size.width;
-			averageBalloonHeight = averageBalloonHeight + minEllipse[i].size.height;
-			numberOfCaptions++;
-			ellipse(drawing, minEllipse[i], color, -1, 8);
-		}*/
 	}
 	averageBalloonHeight /= captionCount;
 	averageBalloonWidth /= captionCount;
@@ -290,12 +271,7 @@ Mat CaptionDetection(Mat inputImage){
 	GaussianBlur(captionDetectImage, captionDetectImage, Size(9, 9), 0, 0);
 	captionDetectImage = fittingEllipse(0, 0, captionDetectImage);
 
-	//cout << averageBalloonWidth << " X " << averageBalloonHeight << endl;
-
-	//cout << "i" << ")\t" << "WxH" << "\t" << "white%" << "\t" << "areaW" << endl;
-
 	for (int i = 0; i < captionCount; i++){
-		//cout << "--------------------------------------------------------------------------------" << endl;
 		Mat replacedImg = replaceROIWithOrigImage(inputImage.clone(), captionMask[i]);
 		Mat element1 = getStructuringElement(MORPH_RECT, Size(10, 12));
 		Mat binarizedReplaceImg = binarizeImage(replacedImg);
@@ -305,19 +281,13 @@ Mat CaptionDetection(Mat inputImage){
 		
 		float area = countNonZero(erodeImage);
 		int areaBlack = areaWholeWhite[i] - area;
-
 		float whitePercent = (area / (captionsEllipse[i].size.width * captionsEllipse[i].size.height)) * 100;
-		
-		//cout << i << ")\t" << contourWidth[i] << "X" << contourHeight[i] << "\t" << whitePercent << "\t" << area << endl;
 		
 		if (whitePercent <= 55 && whitePercent >=35	){
 			captionsDetected[correctCaptionsCount] = captionsEllipse[i];
 			ellipse(outputImage, captionsEllipse[i], Scalar(255, 255, 255), -1, 8);
 			correctCaptionsCount++;
 		}
-
-		//imwrite((string)SAVE_FILE_DEST + "maskafter[" + to_string(i) + "].jpg", erodeImage);
-		
 	}
 	
 	sort(captionsDetected, captionsDetected + correctCaptionsCount, sortByXY);
@@ -361,7 +331,6 @@ Mat CharacterDetection(Mat inputImage){
 		Scalar color = Scalar(255, 255, 255);
 
 		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50){
-			//rectangle(outout, boundRect[i].tl(), boundRect[i].br(), Scalar(255, 0, 0), 1, 8);
 			rectangle(drawing, boundRect[i].tl(), boundRect[i].br(), color, -1, 8);
 		}
 
@@ -382,22 +351,8 @@ Mat CharacterDetection(Mat inputImage){
 			blackchar = totalpixelchar - whitechar;
 
 		if (boundRect[i].width <= inputImage.cols / 20 && boundRect[i].width >= inputImage.cols / 50){
-			//cout << i << "\t" << whitechar << "\t" << totalpixelchar << "\t" <<  blackchar << endl;
-			//rectangle(outout, boundRect[i].tl(), boundRect[i].br(), Scalar(0, 255, 0), 1, 8);
-
-
-
 			averageCharWidth += boundRect[i].width;
 			averageCharHeight += boundRect[i].height;
-
-
-
-			/*resize(inputImage(boundRect[i]), out, Size(150, 150), 0, 0, INTER_LINEAR);
-			out = binarizeImage(out);
-			extractedChar[characterCount] = out;
-			*/
-
-
 
 			Mat out = inputImage(boundRect[i]);
 			int sizechar = 0, charheight = 21;
@@ -416,12 +371,7 @@ Mat CharacterDetection(Mat inputImage){
 				imwrite((String)SAVE_FILE_DEST + "char_mask[" + to_string(i) + "]_" + to_string(sizechar) + ".jpg", characterIndividual);
 
 				sizechar += 20;
-
-
 			}
-
-
-
 		}//end of if
 
 	}// end of for
