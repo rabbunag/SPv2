@@ -9,7 +9,7 @@
 *
 * Date Code Created: July 24, 2014
 * Date Version 2 Created: March 7, 2015
-* Date Modified: April 19, 2015
+* Date Modified: May 1, 2015
 */
 
 /**
@@ -363,13 +363,10 @@ Mat CharacterDetection(Mat inputImage){
 				Mat characterIndividual;
 
 				characterDetection[characterCount] = Rect(boundRect[i].tl().x + 1, boundRect[i].tl().y + sizechar, boundRect[i].width, charheight);
+
+				characterIndividual = inputImage(characterDetection[characterCount]);//out(Rect(start, endPoint));
+
 				characterCount++;
-
-				resize(out(Rect(start, endPoint)), characterIndividual, Size(150, 150), 0, 0, INTER_LINEAR);
-
-
-				imwrite((String)SAVE_FILE_DEST + "char_mask[" + to_string(i) + "]_" + to_string(sizechar) + ".jpg", characterIndividual);
-
 				sizechar += 20;
 			}
 		}//end of if
@@ -381,10 +378,19 @@ Mat CharacterDetection(Mat inputImage){
 
 			cout << averageCharWidth << "\t" << averageCharHeight << endl;
 
+			sort(characterDetection, characterDetection + characterCount, sortByXYRect);
+
 			imwrite((String)SAVE_FILE_DEST + "outout.jpg", outout);
 
 			return drawing;
 } // end of CharacterDetection
+
+void characterIndv(Mat inputImage){
+	for (int i = 0; i < characterCount; i++){
+		extractedChar[i] = inputImage(characterDetection[i]);
+		imwrite((string)SAVE_FILE_DEST + "char[" + to_string(i) + "].jpg", extractedChar[i]);
+	}
+}
 
 /**
 * Character Recognition Functions:
@@ -485,6 +491,104 @@ Mat CharacterFeatureExtraction(){
 	return plottedImg;
 }
 
+Mat MatchingMethod(int, void*, Mat inputImage)
+{
+	/// Source image to display
+	inputImage = extractedChar[21];
+	Mat img_display, result;
+	inputImage.copyTo(img_display);
+	Mat templ = imread("C:\\Users\\Abigail_pc\\Documents\\SP\\SP Data Set\\Hiragana\\hiragana\\na (1).jpg");
+
+	//process inputImage
+	Mat erodeImage, erodeTemplate;
+	Mat element1 = getStructuringElement(MORPH_RECT, Size(3, 3)); //6,3
+	erode(inputImage, erodeImage, element1);
+	erode(templ, erodeTemplate, element1);
+
+	vector<vector<Point> > contours;
+	vector<Vec4i> hierarchy;
+	findContours(binarizeImage(erodeImage), contours, hierarchy, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	vector<vector<Point> > contours_poly(contours.size());
+	vector<Rect> boundRect(contours.size());
+
+	for (int i = 0; i < contours.size(); i++)
+	{
+		approxPolyDP(Mat(contours[i]), contours_poly[i], 3, true);
+		boundRect[i] = boundingRect(Mat(contours_poly[i]));
+	}
+
+	int indexBounding;
+	if (contours.size() > 1) indexBounding = contours.size()-1;
+	else indexBounding = 0;
+	Scalar color = Scalar::all(0);
+	inputImage = inputImage(boundRect[indexBounding]);
+
+	//process template
+	vector<vector<Point> > contours2;
+	vector<Vec4i> hierarchy2;
+	findContours(binarizeImage(erodeTemplate), contours2, hierarchy2, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
+	vector<vector<Point> > contours_poly2(contours2.size());
+	vector<Rect> boundRect2(contours2.size());
+
+	for (int i = 0; i < contours2.size(); i++)
+	{
+		approxPolyDP(Mat(contours2[i]), contours_poly2[i], 3, true);
+		boundRect2[i] = boundingRect(Mat(contours_poly2[i]));
+	}
+
+	if (contours.size() > 1) indexBounding = contours2.size() - 1;
+	else indexBounding = 0;
+	templ = templ(boundRect2[indexBounding]);
+
+	resize(templ, templ, Size(inputImage.cols, inputImage.rows));
+
+	Mat element2 = getStructuringElement(MORPH_RECT, Size(1, 1));
+	dilate(inputImage, inputImage, element2);
+	dilate(templ, templ, element2);
+	erode(inputImage, inputImage, element2);
+	erode(templ, templ, element2);
+
+	inputImage = binarizeImage(inputImage);
+	templ = binarizeImage(templ);
+
+	imwrite((String)SAVE_FILE_DEST + "template.jpg", templ);
+	imwrite((String)SAVE_FILE_DEST + "templateInput.jpg", inputImage);
+
+	/*template matching*/
+	
+	/// Create the result matrix
+	int result_cols = inputImage.cols - templ.cols + 1;
+	int result_rows = inputImage.rows - templ.rows + 1;
+
+	result.create(result_rows, result_cols, CV_32FC1);
+
+	/// Do the Matching and Normalize
+	matchTemplate(inputImage, templ, result, 5);
+	normalize(result, result, 0, 1, NORM_MINMAX, -1, Mat());
+
+	/// Localizing the best match with minMaxLoc
+	double minVal; double maxVal; Point minLoc; Point maxLoc;
+	Point matchLoc;
+
+	minMaxLoc(result, &minVal, &maxVal, &minLoc, &maxLoc, Mat());
+
+	matchLoc = maxLoc;
+
+	/// Show me what you got
+	rectangle(img_display, matchLoc, Point(matchLoc.x + templ.cols, matchLoc.y + templ.rows), Scalar::all(0), 2, 8, 0);
+	rectangle(result, matchLoc, Point(matchLoc.x + templ.cols, matchLoc.y + templ.rows), Scalar::all(0), 2, 8, 0);
+
+	cout << maxVal << endl;
+	if (maxVal >= 0.6)
+		cout << "Template found" << endl;
+	else
+		cout << "Template NOT found" << endl;
+
+	return img_display;
+}
+
+
+
 /**
 * Put to text 
 */
@@ -511,8 +615,6 @@ Mat printToCharacter(Mat inputImg) {
 	int fontFace = FONT_HERSHEY_PLAIN;
 	double fontScale = 1;
 	int thickness = 1;
-
-	sort(characterDetection, characterDetection + characterCount, sortByXYRect);
 
 	cout << characterCount << endl;
 
@@ -562,9 +664,13 @@ int main(int argc, char** argv)
 	img = CharacterDetection(img);
 	imwrite((string)SAVE_FILE_DEST + "Character_Detection.jpg", img);
 
+	characterIndv(origImg);
+
 	/*img = CharacterFeatureExtraction();
 	imwrite((string)SAVE_FILE_DEST + "Character_Plot.jpg", img);*/
 
 	imwrite((String)SAVE_FILE_DEST + "PUTTEXT.jpg", printToCharacter(img));
+
+	imwrite((String)SAVE_FILE_DEST + "MATCH.jpg", MatchingMethod(0,0, origImg));
 	
 }
