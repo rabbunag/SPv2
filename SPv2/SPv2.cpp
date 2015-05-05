@@ -561,10 +561,11 @@ Mat MatchingMethod(int, void*, Mat inputImage)
 
 	templ = templ(boundRect2[indexBounding]);
 	imwrite((String)SAVE_FILE_DEST + "templateRect.jpg", templ);
+	
+	//Retain Aspect Ratio
 	Size newSize(21,21);
 	float ratios[2] = { (float)newSize.width / templ.cols,
 		(float)newSize.height / templ.rows };
-
 	Size sizeIntermediate(templ.cols, templ.rows);
 	if (ratios[0] < ratios[1])
 	{
