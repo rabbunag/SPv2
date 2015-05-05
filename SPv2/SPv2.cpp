@@ -563,6 +563,7 @@ Mat MatchingMethod(int, void*, Mat inputImage)
 	imwrite((String)SAVE_FILE_DEST + "templateRect.jpg", templ);
 	
 	//Retain Aspect Ratio
+	// from http://opencv-users.1802565.n2.nabble.com/Correct-way-to-quot-resize-quot-an-image-Mat-w-o-altering-aspect-ratio-td7580627.html
 	Size newSize(21,21);
 	float ratios[2] = { (float)newSize.width / templ.cols,
 		(float)newSize.height / templ.rows };
