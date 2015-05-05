@@ -345,7 +345,7 @@ Mat CharacterDetection(Mat inputImage){
 	for (int i = 0; i< contours.size(); i++)
 	{
 		Mat characterImg = erodeImageChar(boundRect[i]);
-		Scalar color = Scalar(255, 255, 255);
+		Scalar color = Scalar::all(255);
 		int whitechar = countNonZero(binarizeImage(characterImg)),
 			totalpixelchar = boundRect[i].width * boundRect[i].height,
 			blackchar = totalpixelchar - whitechar;
@@ -354,7 +354,6 @@ Mat CharacterDetection(Mat inputImage){
 			averageCharWidth += boundRect[i].width;
 			averageCharHeight += boundRect[i].height;
 
-			Mat out = inputImage(boundRect[i]);
 			int sizechar = 0, charheight = 21;
 
 			while (sizechar + charheight <= boundRect[i].height) {
@@ -363,8 +362,6 @@ Mat CharacterDetection(Mat inputImage){
 				Mat characterIndividual;
 
 				characterDetection[characterCount] = Rect(boundRect[i].tl().x + 1, boundRect[i].tl().y + sizechar, boundRect[i].width, charheight);
-
-				characterIndividual = inputImage(characterDetection[characterCount]);//out(Rect(start, endPoint));
 
 				characterCount++;
 				sizechar += 20;
@@ -387,8 +384,10 @@ Mat CharacterDetection(Mat inputImage){
 
 void characterIndv(Mat inputImage){
 	for (int i = 0; i < characterCount; i++){
-		extractedChar[i] = inputImage(characterDetection[i]);
-		imwrite((string)SAVE_FILE_DEST + "char[" + to_string(i) + "].jpg", extractedChar[i]);
+		Mat drawing = Mat::zeros(inputImage.size(), CV_8UC3);
+		rectangle(drawing, characterDetection[i], Scalar::all(255), -1, 8);
+		extractedChar[i] = replaceROIWithOrigImage(inputImage.clone(), binarizeImage(drawing));
+		//imwrite((string)SAVE_FILE_DEST + "char[" + to_string(i) + "].jpg", extractedChar[i]);
 	}
 }
 
@@ -493,14 +492,18 @@ Mat CharacterFeatureExtraction(){
 
 Mat MatchingMethod(int, void*, Mat inputImage)
 {
-	/// Source image to display
-	inputImage = extractedChar[21];
+
+	int index = 10;
+	inputImage = extractedChar[index];
+	Mat mask = inputImage;
 	Mat img_display, result;
 	inputImage.copyTo(img_display);
-	Mat templ = imread("C:\\Users\\Abigail_pc\\Documents\\SP\\SP Data Set\\Hiragana\\hiragana\\na (1).jpg");
+
+
+	Mat templ = imread("C:\\Users\\Abigail_pc\\Documents\\SP\\SP Data Set\\Hiragana\\hiragana\\re (2).jpg");
 
 	//process inputImage
-	Mat erodeImage, erodeTemplate;
+	/*Mat erodeImage, erodeTemplate;
 	Mat element1 = getStructuringElement(MORPH_RECT, Size(3, 3)); //6,3
 	erode(inputImage, erodeImage, element1);
 	erode(templ, erodeTemplate, element1);
@@ -522,8 +525,13 @@ Mat MatchingMethod(int, void*, Mat inputImage)
 	else indexBounding = 0;
 	Scalar color = Scalar::all(0);
 	inputImage = inputImage(boundRect[indexBounding]);
-
+	*/
 	//process template
+	Mat erodeTemplate;
+	Mat element1 = getStructuringElement(MORPH_RECT, Size(10, 15)); //6,3
+	erode(templ, erodeTemplate, element1);
+
+	int indexBounding;
 	vector<vector<Point> > contours2;
 	vector<Vec4i> hierarchy2;
 	findContours(binarizeImage(erodeTemplate), contours2, hierarchy2, CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, Point(0, 0));
@@ -536,23 +544,53 @@ Mat MatchingMethod(int, void*, Mat inputImage)
 		boundRect2[i] = boundingRect(Mat(contours_poly2[i]));
 	}
 
-	if (contours.size() > 1) indexBounding = contours2.size() - 1;
-	else indexBounding = 0;
+	Mat contoursImg = templ;
+	indexBounding = 0;
+	for (int i = 0; i< contours2.size(); i++)
+	{
+		Scalar color = Scalar(255, 0, 0);
+		float whitepercentageContour = ((float)countNonZero(binarizeImage(erodeTemplate(boundRect2[i]))) / (contoursImg(boundRect2[i]).cols*contoursImg(boundRect2[i]).rows)) * 100;
+		printf("%d\t%f\n", i,whitepercentageContour);
+		if (whitepercentageContour <= 50){
+			indexBounding = i;
+			printf("indexBounding: %d\n", indexBounding);
+			rectangle(contoursImg, boundRect2[i].tl(), boundRect2[i].br(), color, 2, 8, 0);
+			break;
+		}
+	}
+
 	templ = templ(boundRect2[indexBounding]);
+	imwrite((String)SAVE_FILE_DEST + "templateRect.jpg", templ);
+	Size newSize(21,21);
+	float ratios[2] = { (float)newSize.width / templ.cols,
+		(float)newSize.height / templ.rows };
 
-	resize(templ, templ, Size(inputImage.cols, inputImage.rows));
+	Size sizeIntermediate(templ.cols, templ.rows);
+	if (ratios[0] < ratios[1])
+	{
+		sizeIntermediate.width = (int)(sizeIntermediate.width * ratios[0] + 0.5);
+		sizeIntermediate.height = (int)(sizeIntermediate.height * ratios[0] + 0.5);
+	}
+	else
+	{
+		sizeIntermediate.width = (int)(sizeIntermediate.width * ratios[1] + 0.5);
+		sizeIntermediate.height = (int)(sizeIntermediate.height * ratios[1] + 0.5);
+	}
 
-	Mat element2 = getStructuringElement(MORPH_RECT, Size(1, 1));
+	cout << sizeIntermediate << endl;
+	resize(templ, templ, sizeIntermediate);
+
+	/*Mat element2 = getStructuringElement(MORPH_RECT, Size(1, 1));
 	dilate(inputImage, inputImage, element2);
 	dilate(templ, templ, element2);
 	erode(inputImage, inputImage, element2);
 	erode(templ, templ, element2);
 
 	inputImage = binarizeImage(inputImage);
-	templ = binarizeImage(templ);
+	templ = binarizeImage(templ);*/
 
 	imwrite((String)SAVE_FILE_DEST + "template.jpg", templ);
-	imwrite((String)SAVE_FILE_DEST + "templateInput.jpg", inputImage);
+	imwrite((String)SAVE_FILE_DEST + "templateInput.jpg", contoursImg);
 
 	/*template matching*/
 	
@@ -564,7 +602,7 @@ Mat MatchingMethod(int, void*, Mat inputImage)
 
 	/// Do the Matching and Normalize
 	matchTemplate(inputImage, templ, result, 5);
-	normalize(result, result, 0, 1, NORM_MINMAX, -1, Mat());
+	//normalize(result, result, 0, 1, NORM_MINMAX, -1, Mat());
 
 	/// Localizing the best match with minMaxLoc
 	double minVal; double maxVal; Point minLoc; Point maxLoc;
@@ -575,11 +613,20 @@ Mat MatchingMethod(int, void*, Mat inputImage)
 	matchLoc = maxLoc;
 
 	/// Show me what you got
-	rectangle(img_display, matchLoc, Point(matchLoc.x + templ.cols, matchLoc.y + templ.rows), Scalar::all(0), 2, 8, 0);
+	rectangle(img_display, matchLoc, Point(matchLoc.x + templ.cols, matchLoc.y + templ.rows), Scalar(0,0,255), 1, 8, 0);
 	rectangle(result, matchLoc, Point(matchLoc.x + templ.cols, matchLoc.y + templ.rows), Scalar::all(0), 2, 8, 0);
 
-	cout << maxVal << endl;
-	if (maxVal >= 0.6)
+	//putText(mask, ".", matchLoc, FONT_HERSHEY_PLAIN, 0.5, Scalar(0, 255, 0), 1, 8);
+	imwrite((String)SAVE_FILE_DEST + "templateresult.jpg", result);
+
+	Mat b = binarizeImage(mask(Rect(matchLoc, Point(matchLoc.x + templ.cols, matchLoc.y + templ.rows))));
+	float whitepercentage = ((float)countNonZero(b) / (templ.cols * templ.rows)) * 100;
+	cout << maxVal <<"\t" << whitepercentage<< "%" << endl;
+
+	//cout << maxVal << endl;
+	//cout << matchLoc << "\t" << characterDetection[index].tl() << "\t" << matchLoc.x + templ.cols << "\t" << matchLoc.y<< endl;
+
+	if (whitepercentage >= 60)
 		cout << "Template found" << endl;
 	else
 		cout << "Template NOT found" << endl;
